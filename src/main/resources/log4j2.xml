@@ -24,7 +24,11 @@
             <AppenderRef ref="MyFile"/>
         </Logger>
 
-        <Root level="debug">
+        <Logger name="org" level="error">
+            <AppenderRef ref="STDOUT"/>
+        </Logger>
+
+        <Root level="error">
             <AppenderRef ref="STDOUT"/>
         </Root>
     </Loggers>

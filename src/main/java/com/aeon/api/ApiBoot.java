@@ -1,16 +1,14 @@
 package com.aeon.api;
 
-import com.aeon.api.resource.ApplicationConfig;
-import com.aeon.api.resource.CustomerResource;
+import com.aeon.api.config.ApiResourceConfig;
+import io.netty.channel.Channel;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.glassfish.grizzly.http.server.HttpServer;
-import org.glassfish.jersey.grizzly2.httpserver.GrizzlyHttpServerFactory;
+import org.glassfish.jersey.netty.httpserver.NettyHttpContainerProvider;
 import org.glassfish.jersey.server.ResourceConfig;
 
-import java.io.IOException;
+import javax.ws.rs.core.UriBuilder;
 import java.net.URI;
-import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -27,45 +25,37 @@ public class ApiBoot {
 
         System.setProperty("server.port", serverPort);
 
-        URI BASE_URI = URI.create(String.format("http://localhost:%s/api/", serverPort));
-
-        addShutdownHook();
+        URI BASE_URI = UriBuilder.fromUri("http://localhost")
+                .path("/api")
+                .port(Integer.valueOf(serverPort))
+                .build();
 
         try {
             logger.debug("application starting");
             System.out.println("JSON with Jackson Jersey Example App");
 
             ResourceConfig configuration = createApp();
-            final HttpServer server = GrizzlyHttpServerFactory.createHttpServer(BASE_URI, configuration, false);
-
-            server
-                    .getServerConfiguration().getHttpHandlersWithMapping()
-                    .entrySet().forEach(e -> {
-                System.out.println(e.getKey());
-                System.out.println(e.getValue()[0].getUrlPattern());
-            });
-            System.out.println(configuration.getResources());
-            Runtime.getRuntime().addShutdownHook(new Thread(server::shutdown));
-            server.start();
-
-            System.out.println(String.format("Application started.%nStop the application using CTRL+C"));
-
+            final Channel server = NettyHttpContainerProvider.createHttp2Server(BASE_URI, configuration, null);
+            addShutdownHook(server);
+            System.out.println(String.format("Application started. (HTTP/2 enabled!)\nTry out %s\nStop the application using "
+                    + "CTRL+C.", BASE_URI));
             Thread.currentThread().join();
-        } catch (IOException | InterruptedException ex) {
+        } catch (InterruptedException ex) {
             logger.error("error {}", ex);
         }
 
     }
 
-    static void addShutdownHook() {
+    static void addShutdownHook(final Channel channel) {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            channel.close();
             logger.debug(">>> shutting down the service");
         }));
     }
 
     static ResourceConfig createApp() {
-        ApplicationConfig config = new ApplicationConfig();
-        config.registerClasses(Collections.singleton(CustomerResource.class));
+        ApiResourceConfig config = new ApiResourceConfig();
+//        config.register(new CustomerResource());
         return config;
     }
 }
